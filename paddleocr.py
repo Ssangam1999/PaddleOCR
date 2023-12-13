@@ -410,7 +410,7 @@ def parse_args(mMain=True):
     parser.add_argument("--lang", type=str, default='en')
     parser.add_argument("--det", type=str2bool, default=True)
     parser.add_argument("--rec", type=str2bool, default=True)
-    # parser.add_argument("--type", type=str, default='ocr')
+    #parser.add_argument("--type", type=str, default='ocr')
     parser.add_argument("--type", type=str, default='structure')
     parser.add_argument(
         "--ocr_version",
@@ -668,7 +668,13 @@ class PaddleOCR(predict_system.TextSystem):
         if det and rec:
             ocr_res = []
             for idx, img in enumerate(imgs):
+                # cv2.namedWindow('before', cv2.WINDOW_NORMAL)
+                # cv2.imshow('before', img)
                 img = preprocess_image(img)
+                # cv2.namedWindow('after', cv2.WINDOW_NORMAL)
+                # cv2.imshow('after', img)
+                # cv2.waitKey(0)
+
                 dt_boxes, rec_res, _ = self.__call__(img, cls)
                 if not dt_boxes and not rec_res:
                     ocr_res.append(None)
@@ -771,13 +777,19 @@ class PPStructure(StructureSystem):
             img, return_ocr_result_in_table, img_idx=img_idx)
         return res
 
+def preprocess_image(_image, alpha_color=(255, 255, 255)):
+    _image = alpha_to_color(_image, alpha_color)
+    if inv:
+        _image = cv2.bitwise_not(_image)
+    if bin:
+        _image = binarize_img(_image)
+    return _image
 
-def main():
+
+def main(image_dir):
     # for cmd
     args = parse_args(mMain=True)
-    # image_dir = '/home/rujan/Downloads/testing_img_structure.png'
-    # image_dir = '/home/rujan/Pictures/Screenshot from 2023-10-17 15-38-58.png'
-    image_dir = '/home/rujan/Downloads/Bank of America.pdf'
+
     if is_link(image_dir):
         download_with_progressbar(image_dir, 'tmp.jpg')
         image_file_list: List = ['tmp.jpg']
@@ -816,10 +828,10 @@ def main():
                         right, bottom = bboxes[2]
                         text = line[1][0]
                         confidence = line[1][1]
-                        cv2.rectangle(image, (int(left), int(top)), (int(right), int(bottom)), (255, 255, 1), 1)
+                        cv2.rectangle(image, (int(left), int(top)), (int(right), int(bottom)), (0, 0, 0), 2)
 
-                cv2.namedWindow('Bounding box detected', cv2.WINDOW_NORMAL)
-                cv2.imshow('Bounding box detected', image)
+                cv2.namedWindow('Binarization on: detected', cv2.WINDOW_NORMAL)
+                cv2.imshow('Binarization on: detected', image)
                 cv2.waitKey(0)
 
                 for idx in range(len(result)):
@@ -862,7 +874,15 @@ def main():
                 logger.info('processing {}/{} page:'.format(index + 1,
                                                             len(img_paths)))
                 new_img_name = os.path.basename(new_img_path).split('.')[0]
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                # gray = cv2.GaussianBlur(gray, (1, 1), 0)
+                # gray = cv2.medianBlur(gray,1)
+                # gray = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, \
+                #                      cv2.THRESH_BINARY, 11, 8)
+                _, gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
                 result: List[Dict] = engine(img, img_idx=index)
+
 
                 for page in result:
                     bbox: List[int] = page['bbox']  # ltrb
@@ -872,8 +892,8 @@ def main():
                     res: List = page['res']
                     img_idx = page['img_idx']
 
-                    cv2.rectangle(img, (l, t), (r, b), (0, 0, 12), 1)
-                    cv2.putText(img, str(output_type), (l, t + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 12), 1)
+                    cv2.rectangle(img, (l, t), (r, b), (23, 21, 12), 1)
+                    cv2.putText(img, str(output_type), (l, t + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
                 cv2.namedWindow('img', cv2.WINDOW_NORMAL)
                 cv2.imshow('img', img)
@@ -907,4 +927,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    image_dir = '/home/rujan/Pictures/Screenshot from 2023-12-13 16-13-12.png'
+    # image_dir = '/home/rujan/Documents/Vertex_It/Poc_Sample/Bank_Of_America/Bank of America.pdf'
+    main(image_dir)
